@@ -1,6 +1,8 @@
 #[starknet::contract]
 mod AccountContract {
-    use starknet::{get_caller_address, account::Call, get_tx_info, VALIDATED, call_contract_syscall};
+    use starknet::{
+        get_caller_address, account::Call, get_tx_info, VALIDATED, call_contract_syscall
+    };
     use box::BoxTrait;
     use array::{ArrayTrait, SpanTrait};
     use ecdsa::check_ecdsa_signature;
@@ -17,7 +19,12 @@ mod AccountContract {
     }
 
     #[external(v0)]
-    fn __validate_deploy__(self: @ContractState, contract_address_salt: felt252, entry_point_selector: felt252, public_key: felt252) -> felt252 {
+    fn __validate_deploy__(
+        self: @ContractState,
+        contract_address_salt: felt252,
+        entry_point_selector: felt252,
+        public_key: felt252
+    ) -> felt252 {
         self.validate_transaction()
     }
 
@@ -63,25 +70,25 @@ mod AccountContract {
             VALIDATED
         }
 
-        fn execute_multicall(ref self: ContractState, mut calls: Span<Call>) -> Array<Span<felt252>> {
+        fn execute_multicall(
+            ref self: ContractState, mut calls: Span<Call>
+        ) -> Array<Span<felt252>> {
             let mut result: Array<Span<felt252>> = ArrayTrait::new();
             let mut calls = calls;
 
             loop {
                 match calls.pop_front() {
                     Option::Some(call) => {
-                        match call_contract_syscall(*call.to, *call.selector, call.calldata.span()) {
-                            Result::Ok(mut retdata) => {
-                                result.append(retdata);
-                            },
+                        match call_contract_syscall(
+                            *call.to, *call.selector, call.calldata.span()
+                        ) {
+                            Result::Ok(mut retdata) => { result.append(retdata); },
                             Result::Err(revert_reason) => {
                                 panic_with_felt252('multicall_failed');
                             }
                         }
                     },
-                    Option::None(_) => {
-                        break();
-                    }
+                    Option::None(_) => { break (); }
                 };
             };
             result

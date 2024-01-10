@@ -11,7 +11,8 @@ mod AMM {
     ////////////////////////////////
     const BALANCE_UPPER_BOUND: u128 = 1073741824; // max amount of token to belong to AMM (2^30)
     const POOL_UPPER_BOUND: u128 = 1048576; // max amount to belong to pool (2^20)
-    const ACCOUNT_BALANCE_BOUND: u128 = 104857; // max amount an account can hold (POOL_UPPER_BOUND/10)
+    const ACCOUNT_BALANCE_BOUND: u128 =
+        104857; // max amount an account can hold (POOL_UPPER_BOUND/10)
 
     ////////////////////////////////
     // constants - token types (we'll have just two for simplicity sake)
@@ -37,7 +38,9 @@ mod AMM {
         ////////////////////////////////
         // @dev function to return the balance of an account for a token type
         ////////////////////////////////
-        fn get_account_token_balance(self: @ContractState, account: ContractAddress, token_type: felt252) -> u128 {
+        fn get_account_token_balance(
+            self: @ContractState, account: ContractAddress, token_type: felt252
+        ) -> u128 {
             self.account_balance.read((account, token_type))
         }
 
@@ -71,7 +74,10 @@ mod AMM {
         // @dev function to intialize AMM
         ////////////////////////////////
         fn init_pool(ref self: ContractState, token_a: u128, token_b: u128) {
-            assert(((POOL_UPPER_BOUND - 1) > token_a) & ((POOL_UPPER_BOUND - 1) > token_b), 'exceeds maximum allowed tokens!');
+            assert(
+                ((POOL_UPPER_BOUND - 1) > token_a) & ((POOL_UPPER_BOUND - 1) > token_b),
+                'exceeds maximum allowed tokens!'
+            );
 
             self.set_pool_token_balance(TOKEN_TYPE_A, token_a);
             self.set_pool_token_balance(TOKEN_TYPE_B, token_b);
@@ -84,7 +90,10 @@ mod AMM {
             let account = get_caller_address();
 
             // verify token_from is TOKEN_TYPE_A or TOKEN_TYPE_B
-            assert(token_from - TOKEN_TYPE_A == 0 || token_from - TOKEN_TYPE_B == 0, 'token not allowed in the pool!');
+            assert(
+                token_from - TOKEN_TYPE_A == 0 || token_from - TOKEN_TYPE_B == 0,
+                'token not allowed in the pool!'
+            );
             // check requested amount_from is valid
             assert((BALANCE_UPPER_BOUND - 1) > amount_from, 'exceeds maximum allowed tokens');
 
@@ -96,14 +105,16 @@ mod AMM {
             self.do_swap(account, token_from, token_to, amount_from);
         }
     }
-    
+
 
     #[generate_trait]
     impl AMMHelperImpl of AMMHelperTrait {
         ////////////////////////////////
         // internal function that updates account balance for a given token
         ////////////////////////////////
-        fn modify_account_balance(ref self: ContractState, account: ContractAddress, token_type: felt252, amount: u128) {
+        fn modify_account_balance(
+            ref self: ContractState, account: ContractAddress, token_type: felt252, amount: u128
+        ) {
             let current_balance = self.account_balance.read((account, token_type));
             let new_balance = current_balance + amount;
 
@@ -126,7 +137,13 @@ mod AMM {
         ////////////////////////////////
         // internal function that swaps tokens between the given account and the pool
         ////////////////////////////////
-        fn do_swap(ref self: ContractState, account: ContractAddress, token_from: felt252, token_to: felt252, amount_from: u128) {
+        fn do_swap(
+            ref self: ContractState,
+            account: ContractAddress,
+            token_from: felt252,
+            token_to: felt252,
+            amount_from: u128
+        ) {
             // get pool balance
             let amm_from_balance = self.get_pool_token_balance(token_from);
             let amm_to_balance = self.get_pool_token_balance(token_to);

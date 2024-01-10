@@ -6,11 +6,26 @@ trait IMultisig<TContractState> {
     fn get_num_owners(self: @TContractState) -> usize;
     fn get_owner_pub_key(self: @TContractState, _address: ContractAddress) -> felt252;
     fn set_pub_key(ref self: TContractState, public_key: felt252);
-    fn submit_transaction(ref self: TContractState, contract_address: ContractAddress, entry_point_selector: felt252, calldata: Array<felt252>);
+    fn submit_transaction(
+        ref self: TContractState,
+        contract_address: ContractAddress,
+        entry_point_selector: felt252,
+        calldata: Array<felt252>
+    );
     fn confirm_transaction(ref self: TContractState, tx_index: felt252);
     fn __validate_declare__(self: @TContractState, class_hash: felt252) -> felt252;
-    fn __validate_deploy__(self: @TContractState, class_hash: felt252, contract_address_salt: felt252, _public_key: felt252) -> felt252;
-    fn __validate__(self: @TContractState, contract_address: ContractAddress, entry_point_selector: felt252, calldata: Array<felt252>) -> felt252;
+    fn __validate_deploy__(
+        self: @TContractState,
+        class_hash: felt252,
+        contract_address_salt: felt252,
+        _public_key: felt252
+    ) -> felt252;
+    fn __validate__(
+        self: @TContractState,
+        contract_address: ContractAddress,
+        entry_point_selector: felt252,
+        calldata: Array<felt252>
+    ) -> felt252;
     fn __execute__(ref self: TContractState, tx_index: felt252) -> Span<felt252>;
 }
 
@@ -19,7 +34,13 @@ mod MultiSig {
     ////////////////////////////////
     // library imports
     ////////////////////////////////
-    use starknet::{ContractAddress, get_tx_info, get_caller_address, contract_address_try_from_felt252, contract_address_to_felt252, VALIDATED, call_contract_syscall, StorageAccess, StorageBaseAddress, SyscallResult, storage_address_from_base_and_offset, storage_address_from_base, storage_base_address_from_felt252, storage_write_syscall, storage_read_syscall};
+    use starknet::{
+        ContractAddress, get_tx_info, get_caller_address, contract_address_try_from_felt252,
+        contract_address_to_felt252, VALIDATED, call_contract_syscall, StorageAccess,
+        StorageBaseAddress, SyscallResult, storage_address_from_base_and_offset,
+        storage_address_from_base, storage_base_address_from_felt252, storage_write_syscall,
+        storage_read_syscall
+    };
     use zeroable::Zeroable;
     use ecdsa::check_ecdsa_signature;
     use array::ArrayTrait;
@@ -56,7 +77,7 @@ mod MultiSig {
         has_confirmed: LegacyMap<(ContractAddress, felt252), bool>,
     }
 
-    #[event] 
+    #[event]
     #[derive(Drop, starknet::Event)]
     enum Event {
         SubmittedTransaction: SubmittedTransaction,
@@ -68,7 +89,7 @@ mod MultiSig {
     // SubmittedTransaction - emitted each time a new tx is submitted
     ////////////////////////////////
     #[derive(Drop, starknet::Event)]
-    struct SubmittedTransaction  {
+    struct SubmittedTransaction {
         owner: ContractAddress,
         tx_index: felt252
     }
@@ -147,14 +168,25 @@ mod MultiSig {
         ////////////////////////////////
         // submit transaction - called by any owner to submit a tx
         ////////////////////////////////
-        fn submit_transaction(ref self: ContractState, contract_address: ContractAddress, entry_point_selector: felt252, calldata: Array<felt252>) {
+        fn submit_transaction(
+            ref self: ContractState,
+            contract_address: ContractAddress,
+            entry_point_selector: felt252,
+            calldata: Array<felt252>
+        ) {
             let caller = get_caller_address();
             // check that caller is owner and has set pub key
             self.is_owner(caller);
             self.has_set_pub_key();
 
             // create call
-            let call = Call { to: contract_address, selector: entry_point_selector, calldata: calldata, confirmations: 0_usize, executed: false };
+            let call = Call {
+                to: contract_address,
+                selector: entry_point_selector,
+                calldata: calldata,
+                confirmations: 0_usize,
+                executed: false
+            };
             // get the previous tx ID
             let tx_id = self.prev_tx.read() + 1;
 
@@ -164,9 +196,7 @@ mod MultiSig {
             self.prev_tx.write(tx_id);
 
             // emit SubmittedTransaction
-            self.emit(
-                SubmittedTransaction{ owner: caller, tx_index: tx_id }
-            );
+            self.emit(SubmittedTransaction { owner: caller, tx_index: tx_id });
         }
 
         ////////////////////////////////
@@ -177,25 +207,31 @@ mod MultiSig {
 
             // check caller is owner, tx exists, caller has set pub key and he hasn't confirmed before
             self.is_owner(caller);
-            self.tx_exists( tx_index);
+            self.tx_exists(tx_index);
             self.has_set_pub_key();
             self.has_not_confirmed(caller, tx_index);
 
             // get and deserialize call
-            let Call { to, selector, calldata, confirmations, executed } = self.tx_info.read(tx_index);
+            let Call{to, selector, calldata, confirmations, executed } = self
+                .tx_info
+                .read(tx_index);
             // update no of confirmations by 1
             let no_of_confirmation = confirmations + 1_usize;
             // create an updated call with the new no of confirmations
-            let updated_call = Call { to: to, selector: selector, calldata: calldata, confirmations: no_of_confirmation, executed: executed };
+            let updated_call = Call {
+                to: to,
+                selector: selector,
+                calldata: calldata,
+                confirmations: no_of_confirmation,
+                executed: executed
+            };
 
             // update tx info and has_confirmed status to prevent caller from confirming twice
             self.tx_info.write(tx_index, updated_call);
             self.has_confirmed.write((caller, tx_index), true);
 
             // emit ConfirmedTransaction
-            self.emit(
-                ConfirmedTransaction{ owner: caller, tx_index: tx_index }
-            );
+            self.emit(ConfirmedTransaction { owner: caller, tx_index: tx_index });
         }
 
         ////////////////////////////////
@@ -211,14 +247,24 @@ mod MultiSig {
         ////////////////////////////////
         // __validate_deploy__ validates account deployment tx
         ////////////////////////////////
-        fn __validate_deploy__(self: @ContractState, class_hash: felt252, contract_address_salt: felt252, _public_key: felt252) -> felt252 {
+        fn __validate_deploy__(
+            self: @ContractState,
+            class_hash: felt252,
+            contract_address_salt: felt252,
+            _public_key: felt252
+        ) -> felt252 {
             self.validate_transaction(_public_key)
         }
 
         ////////////////////////////////
         // __validate__ validates a tx before execution
         ////////////////////////////////
-        fn __validate__(self: @ContractState, contract_address: ContractAddress, entry_point_selector: felt252, calldata: Array<felt252>) -> felt252 {
+        fn __validate__(
+            self: @ContractState,
+            contract_address: ContractAddress,
+            entry_point_selector: felt252,
+            calldata: Array<felt252>
+        ) -> felt252 {
             let caller = get_caller_address();
             let _public_key = self.owners_pub_keys.read(caller);
             self.validate_transaction(_public_key)
@@ -235,30 +281,37 @@ mod MultiSig {
             // check tx has not been executed
             self.tx_not_executed(tx_index);
             // get and deserialize call
-            let Call { to, selector, calldata, confirmations, executed } = self.tx_info.read(tx_index);
+            let Call{to, selector, calldata, confirmations, executed } = self
+                .tx_info
+                .read(tx_index);
             // check no. of confirmations is greater than or equal to threshold
             assert(confirmations >= self.threshold.read(), 'min threshold not attained');
 
             // make contract call using the low-level call_contract_syscall
             let retdata: Span<felt252> = call_contract_syscall(
                 address: to, entry_point_selector: selector, calldata: calldata.span()
-            ).unwrap_syscall();
+            )
+                .unwrap_syscall();
 
             // change tx status to executed
-            let updated_call = Call { to: to, selector: selector, calldata: calldata, confirmations: confirmations, executed: true };
+            let updated_call = Call {
+                to: to,
+                selector: selector,
+                calldata: calldata,
+                confirmations: confirmations,
+                executed: true
+            };
             // update tx info
             self.tx_info.write(tx_index, updated_call);
 
             // emit ExecutedTransaction
-            self.emit(
-                ExecutedTransaction{ owner: caller, tx_index: tx_index }
-            );
+            self.emit(ExecutedTransaction { owner: caller, tx_index: tx_index });
 
             // return data
             retdata
         }
     }
-    
+
     #[generate_trait]
     impl MultisigHelperImpl of MultisigHelperTrait {
         ////////////////////////////////
@@ -269,12 +322,8 @@ mod MultiSig {
 
             loop {
                 match multisig_owners.pop_front() {
-                    Option::Some(owner) => {
-                        self.ownership.write(owner, true);
-                    },
-                    Option::None(_) => {
-                        break();
-                    }
+                    Option::Some(owner) => { self.ownership.write(owner, true); },
+                    Option::None(_) => { break (); }
                 };
             };
         }
@@ -299,7 +348,7 @@ mod MultiSig {
         ////////////////////////////////
         fn tx_exists(self: @ContractState, tx_index: felt252) {
             let prev: u8 = self.prev_tx.read().try_into().unwrap();
-        assert(tx_index.try_into().unwrap() <= prev, 'tx does not exist!');
+            assert(tx_index.try_into().unwrap() <= prev, 'tx does not exist!');
         }
 
         ////////////////////////////////
@@ -325,7 +374,7 @@ mod MultiSig {
             let tx_info = get_tx_info().unbox();
             let signature = tx_info.signature;
             assert(signature.len() == 2_u32, 'invalid signature length!');
-            
+
             assert(
                 check_ecdsa_signature(
                     message_hash: tx_info.transaction_hash,
@@ -343,18 +392,16 @@ mod MultiSig {
     ////////////////////////////////
     // Storage Access implementation for Call Struct - such a PITA, hopefully we won't need to do this in the future
     ////////////////////////////////
-    impl CallStorageAccess of StorageAccess::<Call> {
-        fn write(address_domain: u32, base: StorageBaseAddress, value: Call) -> SyscallResult::<()> {
+    impl CallStorageAccess of StorageAccess<Call> {
+        fn write(
+            address_domain: u32, base: StorageBaseAddress, value: Call
+        ) -> SyscallResult::<()> {
             storage_write_syscall(
                 address_domain,
                 storage_address_from_base(base),
                 contract_address_to_felt252(value.to)
             );
-            storage_write_syscall(
-                address_domain,
-                storage_address_from_base(base),
-                value.selector
-            );
+            storage_write_syscall(address_domain, storage_address_from_base(base), value.selector);
             let mut calldata_span = value.calldata.span();
             storage_write_syscall(
                 address_domain,
@@ -362,36 +409,32 @@ mod MultiSig {
                 Serde::deserialize(ref calldata_span).unwrap()
             );
             storage_write_syscall(
-                address_domain,
-                storage_address_from_base(base),
-                value.confirmations.into()
+                address_domain, storage_address_from_base(base), value.confirmations.into()
             );
-            let executed_base = storage_base_address_from_felt252(storage_address_from_base(base).into());
+            let executed_base = storage_base_address_from_felt252(
+                storage_address_from_base(base).into()
+            );
             StorageAccess::write(address_domain, executed_base, value.executed)
         }
 
         fn read(address_domain: u32, base: StorageBaseAddress) -> SyscallResult::<Call> {
-            let to_result = storage_read_syscall(
-                address_domain,
-                storage_address_from_base(base)
-            )?;
+            let to_result = storage_read_syscall(address_domain, storage_address_from_base(base))?;
 
             let selector_result = storage_read_syscall(
-                address_domain,
-                storage_address_from_base(base)
+                address_domain, storage_address_from_base(base)
             )?;
 
             let calldata_result = storage_read_syscall(
-                address_domain,
-                storage_address_from_base(base)
+                address_domain, storage_address_from_base(base)
             )?;
 
             let confirmations_result = storage_read_syscall(
-                address_domain,
-                storage_address_from_base(base)
+                address_domain, storage_address_from_base(base)
             )?;
 
-            let executed_base = storage_base_address_from_felt252(storage_address_from_base(base).into());
+            let executed_base = storage_base_address_from_felt252(
+                storage_address_from_base(base).into()
+            );
             let executed_result: bool = StorageAccess::read(address_domain, executed_base)?;
 
             let mut calldata_arr = ArrayTrait::new();
@@ -408,7 +451,9 @@ mod MultiSig {
             )
         }
 
-        fn write_at_offset_internal(address_domain: u32, base: StorageBaseAddress, offset: u8, value: Call) -> SyscallResult::<()> {
+        fn write_at_offset_internal(
+            address_domain: u32, base: StorageBaseAddress, offset: u8, value: Call
+        ) -> SyscallResult::<()> {
             storage_write_syscall(
                 address_domain,
                 storage_address_from_base_and_offset(base, offset),
@@ -430,32 +475,34 @@ mod MultiSig {
                 storage_address_from_base_and_offset(base, offset + 3_u8),
                 value.confirmations.into()
             );
-            let executed_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, offset + 4_u8).into());
+            let executed_base = storage_base_address_from_felt252(
+                storage_address_from_base_and_offset(base, offset + 4_u8).into()
+            );
             StorageAccess::write(address_domain, executed_base, value.executed)
         }
 
-        fn read_at_offset_internal(address_domain: u32, base: StorageBaseAddress, offset: u8) -> SyscallResult::<Call> {
+        fn read_at_offset_internal(
+            address_domain: u32, base: StorageBaseAddress, offset: u8
+        ) -> SyscallResult::<Call> {
             let to_result = storage_read_syscall(
-                address_domain,
-                storage_address_from_base_and_offset(base, offset)
+                address_domain, storage_address_from_base_and_offset(base, offset)
             )?;
 
             let selector_result = storage_read_syscall(
-                address_domain,
-                storage_address_from_base_and_offset(base, offset + 1_u8)
+                address_domain, storage_address_from_base_and_offset(base, offset + 1_u8)
             )?;
 
             let calldata_result = storage_read_syscall(
-                address_domain,
-                storage_address_from_base_and_offset(base, offset + 2_u8)
+                address_domain, storage_address_from_base_and_offset(base, offset + 2_u8)
             )?;
 
             let confirmations_result = storage_read_syscall(
-                address_domain,
-                storage_address_from_base_and_offset(base, offset + 3_u8)
+                address_domain, storage_address_from_base_and_offset(base, offset + 3_u8)
             )?;
 
-            let executed_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, offset + 4_u8).into());
+            let executed_base = storage_base_address_from_felt252(
+                storage_address_from_base_and_offset(base, offset + 4_u8).into()
+            );
             let executed_result: bool = StorageAccess::read(address_domain, executed_base)?;
 
             let mut calldata_arr = ArrayTrait::new();

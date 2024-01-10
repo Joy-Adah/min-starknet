@@ -73,7 +73,8 @@ mod TokenSale {
             assert(current_time < end_time, 'ICO has ended');
             assert(self.is_registered.read(caller) == false, 'already registered user');
 
-            IERC20Dispatcher{ contract_address: eth }.transfer_from(caller, this_contract, u256_from_felt252(REGPRICE));
+            IERC20Dispatcher { contract_address: eth }
+                .transfer_from(caller, this_contract, u256_from_felt252(REGPRICE));
 
             self.is_registered.write(caller, true);
         }
@@ -92,7 +93,8 @@ mod TokenSale {
             assert(self.is_registered.read(address) == true, 'user is not registered');
             assert(self.is_claimed.read(address) == false, 'user has already claimed');
 
-            IERC20Dispatcher{ contract_address: token }.transfer_from(admin, address, claim_amount);
+            IERC20Dispatcher { contract_address: token }
+                .transfer_from(admin, address, claim_amount);
 
             self.is_claimed.write(address, true);
         }

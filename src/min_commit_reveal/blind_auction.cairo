@@ -21,7 +21,9 @@ trait IERC20<TContractState> {
     fn transfer(ref self: TContractState, recipient: ContractAddress, amount: u256);
 
     #[external]
-    fn transfer_from(ref self: TContractState, sender: ContractAddress, recipient: ContractAddress, amount: u256);
+    fn transfer_from(
+        ref self: TContractState, sender: ContractAddress, recipient: ContractAddress, amount: u256
+    );
 
     #[external]
     fn approve(ref self: TContractState, spender: ContractAddress, amount: u256);
@@ -32,7 +34,10 @@ mod BlindAuction {
     ////////////////////////////////
     // library imports
     ////////////////////////////////
-    use starknet::{ContractAddress, get_caller_address, get_contract_address, get_block_timestamp, contract_address_try_from_felt252, contract_address_to_felt252};
+    use starknet::{
+        ContractAddress, get_caller_address, get_contract_address, get_block_timestamp,
+        contract_address_try_from_felt252, contract_address_to_felt252
+    };
     use traits::TryInto;
     use traits::Into;
     use option::OptionTrait;
@@ -64,7 +69,7 @@ mod BlindAuction {
         bid_claim_status: LegacyMap::<ContractAddress, bool>,
     }
 
-    #[event] 
+    #[event]
     #[derive(Drop, starknet::Event)]
     enum Event {
         Bidded: Bidded,
@@ -93,7 +98,9 @@ mod BlindAuction {
     // Constructor intialized auction admin, duration for bidding and duration for reveal
     ////////////////////////////////
     #[constructor]
-    fn constructor(ref self: ContractState, _admin: ContractAddress, _bidding_time: u64, _reveal_time: u64) {
+    fn constructor(
+        ref self: ContractState, _admin: ContractAddress, _bidding_time: u64, _reveal_time: u64
+    ) {
         let current_time: u64 = get_block_timestamp();
         let bidding_end_time = current_time + _bidding_time;
         let reveal_end_time = bidding_end_time + _reveal_time;
@@ -124,7 +131,7 @@ mod BlindAuction {
             let auction_status = self.auction_ended.read();
             assert(auction_status == true, 'auction has not ended');
             let _highest_bidder = self.highest_bidder.read();
-            _highest_bidder.bid      
+            _highest_bidder.bid
         }
 
         ////////////////////////////////
@@ -135,7 +142,10 @@ mod BlindAuction {
             let this_contract = get_contract_address();
             let current_time: u64 = get_block_timestamp();
             let bidding_end_time = self.bidding_ends.read();
-            let eth_contract: ContractAddress = contract_address_try_from_felt252(0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7).unwrap();
+            let eth_contract: ContractAddress = contract_address_try_from_felt252(
+                0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7
+            )
+                .unwrap();
 
             // assert bidding time is not over
             assert(current_time < bidding_end_time, 'bidding is ended');
@@ -150,18 +160,18 @@ mod BlindAuction {
             let bid_commit = self.hash(12345, bid_to_felt);
 
             // check that the user has beforehand approved the address of the BlindAuction contract to spend the bid amount from his ETH balance
-            let allowance = IERC20Dispatcher {contract_address: eth_contract}.allowance(caller, this_contract);
+            let allowance = IERC20Dispatcher { contract_address: eth_contract }
+                .allowance(caller, this_contract);
             assert(allowance >= _bid, 'approve the bid amount!');
             // transfer the ETH to this contract
-            IERC20Dispatcher {contract_address: eth_contract}.transfer_from(caller, this_contract, _bid);
+            IERC20Dispatcher { contract_address: eth_contract }
+                .transfer_from(caller, this_contract, _bid);
 
             // add bid to storage
             self.user_bid.write(caller, bid_commit);
 
             // emit Bidded
-            self.emit(
-                Bidded{ bidder: caller, bid_commit: bid_commit }
-            );
+            self.emit(Bidded { bidder: caller, bid_commit: bid_commit });
         }
 
         ////////////////////////////////
@@ -175,7 +185,10 @@ mod BlindAuction {
             let reveal_end_time = self.reveal_ends.read();
 
             // assert bid time is over and reveal time is not
-            assert(current_time > bidding_end_time && current_time < reveal_end_time, 'not the right time for reveal');
+            assert(
+                current_time > bidding_end_time && current_time < reveal_end_time,
+                'not the right time for reveal'
+            );
 
             // hash bid and check its equal to user's bid_commit
             let bid_to_felt: felt252 = _bid.low.into();
@@ -185,7 +198,7 @@ mod BlindAuction {
             // check if bid is higher than the highest bid and thus make it the new highest bid
             let _highest_bidder: HighestBidder = self.highest_bidder.read();
             let _highest_bid = _highest_bidder.bid;
-            if(_bid > _highest_bid) {
+            if (_bid > _highest_bid) {
                 let _highest_bidder = HighestBidder { bidder: caller, bid: _bid };
                 self.highest_bidder.write(_highest_bidder);
                 return ();
@@ -203,7 +216,10 @@ mod BlindAuction {
             let current_time: u64 = get_block_timestamp();
             let reveal_end_time = self.reveal_ends.read();
             let _highest_bidder = self.highest_bidder.read();
-            let eth_contract: ContractAddress = contract_address_try_from_felt252(0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7).unwrap();
+            let eth_contract: ContractAddress = contract_address_try_from_felt252(
+                0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7
+            )
+                .unwrap();
 
             // check that caller is the auction admin
             assert(caller == admin_address, 'caller is not admin!');
@@ -212,7 +228,8 @@ mod BlindAuction {
 
             // transfer highest bid deposit to admin
             let _highest_bid = _highest_bidder.bid;
-            IERC20Dispatcher {contract_address: eth_contract}.transfer(admin_address, _highest_bid);
+            IERC20Dispatcher { contract_address: eth_contract }
+                .transfer(admin_address, _highest_bid);
 
             // change highest_bidder claim status to true, to ensure he can't try to claim back his tokens
             self.bid_claim_status.write(_highest_bidder.bidder, true);
@@ -220,9 +237,7 @@ mod BlindAuction {
             // end Auction 
             self.auction_ended.write(true);
             // emit AuctionEnded 
-            self.emit(
-                AuctionEnded{ winner: _highest_bidder.bidder, highest_bid: _highest_bid }
-            );
+            self.emit(AuctionEnded { winner: _highest_bidder.bidder, highest_bid: _highest_bid });
         }
 
         ////////////////////////////////
@@ -232,8 +247,11 @@ mod BlindAuction {
             let caller = get_caller_address();
             let auction_status = self.auction_ended.read();
             let bid_commit = self.user_bid.read(caller);
-            let eth_contract: ContractAddress = contract_address_try_from_felt252(0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7).unwrap();
-            
+            let eth_contract: ContractAddress = contract_address_try_from_felt252(
+                0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7
+            )
+                .unwrap();
+
             // check auction has ended
             assert(auction_status == true, 'auction has not ended!');
 

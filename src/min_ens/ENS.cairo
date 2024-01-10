@@ -10,7 +10,7 @@ mod ENS {
     // storage variables
     ////////////////////////////////
     #[storage]
-    struct Storage{
+    struct Storage {
         names: LegacyMap::<ContractAddress, felt252>,
     }
 
@@ -47,9 +47,7 @@ mod ENS {
         fn store_name(ref self: ContractState, _name: felt252) {
             let caller = get_caller_address();
             self.names.write(caller, _name);
-            self.emit(
-                StoredName{ address: caller, name: _name }
-            );
+            self.emit(StoredName { address: caller, name: _name });
         }
 
         ////////////////////////////////
